@@ -1,4 +1,4 @@
-/* Copyright (c) 2017 FIRST. All rights reserved.
+/* Copyright (c) 2018 FIRST. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted (subject to the limitations in the disclaimer below) provided that
@@ -147,7 +147,7 @@ public class AutoSquare extends LinearOpMode {
         while (allowedToMove()) {
             telemetry.addData("colorSensor", colorSensor.getNormalizedColors());
             if (allowedToMove() && tapeIsntThere()) {
-                moveForward(8);
+                moveForward(1);
             } else if (shouldTurnLeft()) {
                 turnLeft90Degrees();
             } else if (shouldTurnRight()) {

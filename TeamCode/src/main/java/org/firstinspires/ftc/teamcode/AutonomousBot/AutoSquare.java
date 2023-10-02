@@ -180,7 +180,7 @@ public class AutoSquare extends LinearOpMode {
 
     private boolean shouldTurnRightcolor() {
         return !tapeIsntThere();}
-
+//hey
     private boolean tapeIsntThere() {
         return getBrightness() > WHITE_THRESHOLD;
     }

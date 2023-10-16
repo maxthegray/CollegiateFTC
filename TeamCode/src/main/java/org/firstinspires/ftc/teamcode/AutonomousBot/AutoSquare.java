@@ -1,4 +1,4 @@
-//hey
+
 
 /* Copyright (c) 2018 FIRST. All rights reserved.
  *
@@ -43,33 +43,9 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 
-/*
- * This OpMode illustrates the concept of driving a path based on encoder counts.
- * The code is structured as a LinearOpMode
- *
- * The code REQUIRES that you DO have encoders on the wheels,
- *   otherwise you would use: RobotAutoDriveByTime;
- *
- *  This code ALSO requires that the drive Motors have been configured such that a positive
- *  power command moves them forward, and causes the encoders to count UP.
- *
- *   The desired path in this example is:
- *   - Drive forward for 48 inches
- *   - Spin right for 12 Inches
- *   - Drive Backward for 24 inches
- *   - Stop and close the claw.
- *
- *  The code is written using a method called: encoderDrive(speed, leftInches, rightInches, timeoutS)
- *  that performs the actual movement.
- *  This method assumes that each movement is relative to the last stopping place.
- *  There are other ways to perform encoder based moves, but this method is probably the simplest.
- *  This code uses the RUN_TO_POSITION mode to enable the Motor controllers to generate the run profile
- *
- * Use Android Studio to Copy this Class, and Paste it into your team's code folder with a new name.
- * Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
- */
 
-@Autonomous(name="Robot: dont crash into things and hug the wall", group="Robot")
+
+@Autonomous(name="ChairTrack: Colorsensor", group="Robot")
 //@Disabled
 public class AutoSquare extends LinearOpMode {
     private DistanceSensor sensorDistanceFront;
@@ -93,21 +69,23 @@ public class AutoSquare extends LinearOpMode {
     static final double     WHEEL_DIAMETER_INCHES   = 4.0 ;     // For figuring circumference
     static final double     COUNTS_PER_INCH         = (COUNTS_PER_MOTOR_REV * DRIVE_GEAR_REDUCTION) /
             (WHEEL_DIAMETER_INCHES * 3.1415);
-    static final double     DRIVE_SPEED             = 0.6;
+    static final double     DRIVE_SPEED             = .75;
     static final double     TURN_SPEED              = 0.5;
     private int i;
 
-    static final double     WHITE_THRESHOLD = 0.5;  // spans between 0.0 - 1.0 from dark to light
-    static final double     APPROACH_SPEED  = 0.25;
+    static final double GROUND_BRIGHTNESS = 0.85;  // spans between 0.0 - 1.0 from dark to light
+
 
     @Override
     public void runOpMode() {
 
         // Initialize the drive system variables.
-        leftDrive  = hardwareMap.get(DcMotor.class, "leftBackMotor");
+        leftDrive = hardwareMap.get(DcMotor.class, "leftBackMotor");
         rightDrive = hardwareMap.get(DcMotor.class, "rightBackMotor");
+        sensorDistanceLeft = hardwareMap.get(DistanceSensor.class, "sensor_distance2");
+        colorSensor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor");
 
-        // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
+        // To drive forward, most robots need the motor on one side to be reversed, because the axles point 4n opposite directions.
         // When run, this OpMode should start both motors driving forward. So adjust these two lines based on your first test drive.
         // Note: The settings here assume direct drive on left and right wheels.  Gear Reduction or 90 Deg drives may require direction flips
         leftDrive.setDirection(DcMotor.Direction.REVERSE);
@@ -120,58 +98,44 @@ public class AutoSquare extends LinearOpMode {
         rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         // Send telemetry message to indicate successful Encoder reset
-        telemetry.addData("Starting at",  "%7d :%7d",
+        telemetry.addData("Starting at", "%7d :%7d",
                 leftDrive.getCurrentPosition(),
                 rightDrive.getCurrentPosition());
+        telemetry.addData("Starting at", "%7d :%7d");
+        getBrightness();
         telemetry.update();
+
         // you can use this as a regular DistanceSensor.
-        sensorDistanceFront = hardwareMap.get(DistanceSensor.class, "sensor_distance");
-        sensorDistanceLeft = hardwareMap.get(DistanceSensor.class, "sensor_distance2");
-        colorSensor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor");
+//        sensorDistanceFront = hardwareMap.get(DistanceSensor.class, "sensor_distance");
+
 
         telemetry.update();
 
         if (colorSensor instanceof SwitchableLight) {
-            ((SwitchableLight)colorSensor).enableLight(true);
+            ((SwitchableLight) colorSensor).enableLight(true);
         }
 
         // Wait for the game to start (driver presses PLAY)
+
+
+        while (opModeInInit()) {
+            getBrightness();
+        }
         waitForStart();
-        colorSensor.setGain(15);
+        colorSensor.setGain(0);
 
-        while(opModeInInit()) {
-              // Send telemetry message to signify robot waiting;
-              telemetry.addData("Status", "Ready to drive to white line.");    //
 
-              // Display the light level while we are waiting to start
-             getBrightness();
-          }
         while (allowedToMove()) {
-            telemetry.addData("colorSensor", colorSensor.getNormalizedColors());
-            if (allowedToMove() && tapeIsntThere()) {
-                moveForward(1);
-            } else if (shouldTurnLeft()) {
-                turnLeft90Degrees();
-            } else if (shouldTurnRight()) {
-                turnRight90Degrees();
+            getBrightness();
+            if (tapeIsntThere()) {
+                moveForward(4);
+            } else {
+                goAroundStool();
+                moveForward(84);
             }
         }
-//        while (allowedToMove()) {
-//            //telemetry
-//            telemetry.addData("distance_sensor1", sensorDistanceFront.getDeviceName() );
-//            telemetry.addData("range", String.format("%.01f in", sensorDistanceFront.getDistance(DistanceUnit.INCH)));
-//            telemetry.addData("distance_sensor2", sensorDistanceLeft.getDeviceName() );
-//            telemetry.addData("range", String.format("%.01f in", sensorDistanceLeft.getDistance(DistanceUnit.INCH)));
-//            if (shouldMoveForward()) {
-//                moveForward(8);
-//            } else if (shouldTurnLeft()) {
-//                turnLeft90Degrees();
-//            } else if (shouldTurnRight()) {
-//                turnRight90Degrees();
-//            }
-//        }
-    }
 
+    }
 
     private boolean allowedToMove() {
         return opModeIsActive();
@@ -183,23 +147,34 @@ public class AutoSquare extends LinearOpMode {
 
     private boolean shouldTurnRightcolor() {
         return !tapeIsntThere();}
-//hey
+
     private boolean tapeIsntThere() {
-        return getBrightness() > WHITE_THRESHOLD;
+        return getBrightness() > GROUND_BRIGHTNESS;
     }
-    private void turnRight90Degreescolor() {
-        encoderDrive(TURN_SPEED, 7, 7, 0.25);
+    private void goAroundStool() {
+        moveForward(18);
+        turnLeftcolor(7);
+        moveForward(18);
+        turnLeftcolor(7);
+    }
+    private void turnRightcolor() {
         encoderDrive(TURN_SPEED, 7, -7, 0.25);
     }
 
-    private void turnLeft90Degreescolor() {
-        encoderDrive(TURN_SPEED, 7, 7, 0.25);
-        encoderDrive(TURN_SPEED, -7, 7, 0.25);
+    private void turnLeftcolor(int amount) {
+        encoderDrive(TURN_SPEED, -amount, amount, 0.25);
+    }
+    double getBrightness() {
+        NormalizedRGBA colors = colorSensor.getNormalizedColors();
+        telemetry.addData("Light Level (0 to 1)",  "%4.2f", colors.alpha);
+        telemetry.update();
+
+        return colors.alpha;
     }
     //Not Color Stuff
     private boolean shouldMoveForward() {
         return enoughDistanceInFront() && wallOnTheLeft();
-    }
+   }
 
     private boolean shouldTurnLeft() {
         return enoughDistanceInFront() && !wallOnTheLeft();
@@ -216,26 +191,19 @@ public class AutoSquare extends LinearOpMode {
     private boolean wallOnTheLeft() {
         return sensorDistanceLeft.getDistance(DistanceUnit.INCH) <= 6;
     }
-
+//
     private void moveForward(int distance) {
-        double roomInFront = sensorDistanceFront.getDistance(DistanceUnit.INCH) - distance;
-        encoderDrive(DRIVE_SPEED, roomInFront, roomInFront, 0.25);
+        encoderDrive(DRIVE_SPEED, distance, distance, 0.25);
     }
-    private void turnRight90Degrees() {
-        encoderDrive(TURN_SPEED, 7, -7, 0.25);
-    }
+//    private void turnRight90Degrees() {
+//        encoderDrive(TURN_SPEED, 7, -7, 0.25);
+//    }
+//
+//    private void turnLeft90Degrees() {
+//        encoderDrive(TURN_SPEED, -7, 7, 0.25);
+//    }
+//
 
-    private void turnLeft90Degrees() {
-        encoderDrive(TURN_SPEED, -7, 7, 0.25);
-    }
-
-    double getBrightness() {
-        NormalizedRGBA colors = colorSensor.getNormalizedColors();
-        telemetry.addData("light Level (0 to 1)", "%4.2f", colors.alpha);
-        telemetry.update();
-
-        return colors.alpha;
-    }
 
     /*
      *  Method to perform a relative move, based on encoder counts.

@@ -1,38 +1,10 @@
-/* Copyright (c) 2017 FIRST. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted (subject to the limitations in the disclaimer below) provided that
- * the following conditions are met:
- *
- * Redistributions of source code must retain the above copyright notice, this list
- * of conditions and the following disclaimer.
- *
- * Redistributions in binary form must reproduce the above copyright notice, this
- * list of conditions and the following disclaimer in the documentation and/or
- * other materials provided with the distribution.
- *
- * Neither the name of FIRST nor the names of its contributors may be used to endorse or
- * promote products derived from this software without specific prior written permission.
- *
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS
- * LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
-package org.firstinspires.ftc.teamcode.AutonomousBot;
+package org.firstinspires.ftc.teamcode.AutonomousBot.FollowTheLine;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 import com.qualcomm.robotcore.hardware.NormalizedRGBA;
@@ -41,41 +13,26 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
-/*
- * This OpMode illustrates the concept of driving up to a line and then stopping.
- * The code is structured as a LinearOpMode
- *
- * The Sensor used here can be a REV Color Sensor V2 or V3.  Make sure the white LED is turned on.
- * The sensor can be plugged into any I2C port, and must be named "sensor_color" in the active configuration.
- *
- *   Depending on the height of your color sensor, you may want to set the sensor "gain".
- *   The higher the gain, the greater the reflected light reading will be.
- *   Use the SensorColor sample in this folder to determine the minimum gain value that provides an
- *   "Alpha" reading of 1.0 when you are on top of the white line.  In this sample, we use a gain of 15
- *   which works well with a Rev V2 color sensor
- *
- *   Setting the correct WHITE_THRESHOLD value is key to stopping correctly.
- *   This should be set halfway between the bare-tile, and white-line "Alpha" values.
- *   The reflected light value can be read on the screen once the OpMode has been INIT, but before it is STARTED.
- *   Move the sensor on and off the white line and note the min and max readings.
- *   Edit this code to make WHITE_THRESHOLD halfway between the min and max.
- *
- *   Use Android Studio to Copy this Class, and Paste it into your team's code folder with a new name.
- *   Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
- */
 
-@Autonomous(name="Robot: Follow The Line Left/Right", group="Robot")
+@Autonomous(name="FTL: without encoder drive manual", group="FTL")
 //@Disabled
-public class FollowTheLine extends LinearOpMode {
+public class FTLturn extends LinearOpMode {
 
     /* Declare OpMode members. */
+    private double          headingError  = 0;
+
     private DcMotor         leftDrive   = null;
     private DcMotor         rightDrive  = null;
     private IMU imu         = null;
-    NormalizedColorSensor colorSensor;
-    private double          headingError  = 0;
+    NormalizedColorSensor colorSensor1;
+    NormalizedColorSensor colorSensor2;
+    private DistanceSensor distanceSensorLeft;
+    private DistanceSensor distanceSensorRight;
+    private ElapsedTime     runtime = new ElapsedTime();
+
 
     private double  targetHeading = 0;
     private double  driveSpeed    = 0;
@@ -84,8 +41,12 @@ public class FollowTheLine extends LinearOpMode {
     private double  rightSpeed    = 0;
     private int     leftTarget    = 0;
     private int     rightTarget   = 0;
+    double power = 0;
+    double tpower = 0;
+    double apower = 0;
+    boolean movingforward = true;
 
-    static final double whiteThreshold = 0.5;  // spans between 0.0 - 1.0 from dark to light
+    static final double whiteThreshold = 0.20;  // spans between 0.0 - 1.0 from dark to light
 
     static final double     COUNTS_PER_MOTOR_REV    = 1440 ;
     static final double     DRIVE_GEAR_REDUCTION    = 1.0 ; //no external gearing
@@ -93,32 +54,35 @@ public class FollowTheLine extends LinearOpMode {
     static final double     COUNTS_PER_INCH         = (COUNTS_PER_MOTOR_REV * DRIVE_GEAR_REDUCTION) /
             (WHEEL_DIAMETER_INCHES * 3.1415);
 
-    static final double     DRIVE_SPEED             = .3;     // Max driving speed for better distance accuracy.
-    static final double     TURN_SPEED              = 0.1;     // Max Turn speed to limit turn rate
+    static final double     DRIVE_SPEED             = 0.1;     // Max driving speed for better distance accuracy.
+    static final double     TURN_SPEED              = 0.03;     // Max Turn speed to limit turn rate
 
-    static final double     HEADING_THRESHOLD       = 0.01 ;    // How close must the heading get to the target before moving to next step.
+    static final double     HEADING_THRESHOLD       = 1.0 ;    // How close must the heading get to the target before moving to next step.
 
     static final double     P_TURN_GAIN            = 0.02;     // Larger is more responsive, but also less stable
-    static final double     P_DRIVE_GAIN           = 0.3;     // Larger is more responsive, but also less stable
+    static final double     P_DRIVE_GAIN           = 0.03;     // Larger is more responsive, but also less stable
+    ElapsedTime getOut = new ElapsedTime();
 
     @Override
     public void runOpMode() {
 
-        // Initialize the drive system variables.
-        leftDrive  = hardwareMap.get(DcMotor.class, "leftBackMotor");
-        rightDrive = hardwareMap.get(DcMotor.class, "rightBackMotor");
+        // initialize the drive variables.
+//            Robot robot = new Robot(hardwareMap, new Movement()); stoopid i hate java
+        // TO MAX: once you've moved all the code:
+        leftDrive = hardwareMap.get(DcMotor.class, "left_drive");
+        rightDrive = hardwareMap.get(DcMotor.class, "right_drive");
         imu = hardwareMap.get(IMU.class, "imu");
-        colorSensor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor");
-        // Get a reference to our sensor object. It's recommended to use NormalizedColorSensor over
-        // ColorSensor, because NormalizedColorSensor consistently gives values between 0 and 1, while
-        // the values you get from ColorSensor are dependent on the specific sensor you're using.
+        colorSensor1 = hardwareMap.get(NormalizedColorSensor.class, "sensor_color1");
+        colorSensor2 = hardwareMap.get(NormalizedColorSensor.class, "sensor_color2");
+        distanceSensorLeft = hardwareMap.get(DistanceSensor.class, "sensor_distance");
+        distanceSensorRight = hardwareMap.get(DistanceSensor.class, "sensor_distance2");
+
 
         RevHubOrientationOnRobot.LogoFacingDirection logoDirection = RevHubOrientationOnRobot.LogoFacingDirection.UP;
         RevHubOrientationOnRobot.UsbFacingDirection usbDirection = RevHubOrientationOnRobot.UsbFacingDirection.FORWARD;
         RevHubOrientationOnRobot orientationOnRobot = new RevHubOrientationOnRobot(logoDirection, usbDirection);
         imu.initialize(new IMU.Parameters(orientationOnRobot));
 
-        // If there are encoders connected, switch to RUN_USING_ENCODER mode for greater accuracy
         leftDrive.setDirection(DcMotor.Direction.REVERSE);
         rightDrive.setDirection(DcMotor.Direction.FORWARD);
         leftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
@@ -126,87 +90,188 @@ public class FollowTheLine extends LinearOpMode {
         leftDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        // Set the encoders for closed loop speed control, and reset the heading.
         leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         imu.resetYaw();
 
-
-        if (colorSensor instanceof SwitchableLight) {
-            ((SwitchableLight)colorSensor).enableLight(true);
+        if (colorSensor1 instanceof SwitchableLight) {
+            ((SwitchableLight) colorSensor1).enableLight(true);
         }
+        if (colorSensor2 instanceof SwitchableLight) {
+            ((SwitchableLight) colorSensor1).enableLight(true);
+        }
+
+
+        colorSensor1.setGain(15);
+        colorSensor2.setGain(15);
 
 
         while (opModeInInit()) {
 
-        }
+            if (getBrightness1() > whiteThreshold && getBrightness2() > whiteThreshold) {
+                telemetry.addData("Status", "In between line, ready to go");
+            } else if (getBrightness1() < whiteThreshold && getBrightness2() < whiteThreshold) {
+                telemetry.addData("Status", "above white threshold on both sensors");
 
-        // If necessary, turn ON the white LED (if there is no LED switch on the sensor)
-        // Some sensors allow you to set your light sensor gain for optimal sensitivity...
-        // See the SensorColor sample in this folder for how to determine the optimal gain.
-        // A gain of 15 causes a Rev Color Sensor V2 to produce an Alpha value of 1.0 at about 1.5" above the floor.
-        colorSensor.setGain(15);
-
-        // Wait for driver to press PLAY)
-        // Abort this loop is started or stopped.
-        while (opModeInInit()) {
-            if (getBrightness() < whiteThreshold) {
-                telemetry.addData("Status", "Line is Detected");
+            } else if (getBrightness1() < whiteThreshold && getBrightness2() > whiteThreshold) {
+                telemetry.addData("Status", "above white threshold on color sensor 1");
+            } else if (getBrightness1() > whiteThreshold && getBrightness2() < whiteThreshold) {
+                telemetry.addData("Status", "above white threshold on color sensor 2");
             } else {
-                telemetry.addData("Status","Line Is Not Detected");
+                telemetry.addData("Status", "error of some sort");
             }
-            telemetry.addData(">", "Robot Heading = %4.0f", getHeading());
+
+            doAllTelemetry();
             telemetry.update();
+
             imu.resetYaw();
-
-            // Display the light level while we are waiting to start
-            getBrightness();
         }
-        while (opModeIsActive()) {
-            if (getBrightness() < whiteThreshold) {
-                leftDrive.setPower(DRIVE_SPEED);
-                rightDrive.setPower(DRIVE_SPEED);
-            } else if(getBrightness() > whiteThreshold) {
-                checkforline(15);
-                imu.resetYaw();
+        power = 0.1;
+        tpower = 0.0;
+        apower = 0.3;
+        //with gyro motion
+        waitForStart();
 
+        while (opModeIsActive()) {
+            doAllTelemetry();
+
+            telemetry.addData("power", "%4.2f", power);
+            telemetry.addData("turning power", "%4.2f", tpower);
+
+            telemetry.update();
+
+            imu.resetYaw();
+            if (rightSensorCheck()) {
+
+                leftDrive.setPower(tpower);
+                rightDrive.setPower(power);
+
+            } else if (leftSensorCheck()) {
+
+                leftDrive.setPower(power);
+                rightDrive.setPower(tpower);
+
+            } else {
+
+                setSpeed(power);
             }
         }
+    }
+    private void doAllTelemetry() {
+        NormalizedRGBA colors1 = colorSensor1.getNormalizedColors();
+        telemetry.addData("Light Level (0 to 1)Left Sensor",  "%4.2f", colors1.alpha);
+        NormalizedRGBA colors2 = colorSensor2.getNormalizedColors();
+        telemetry.addData("Light Level (0 to 1) Right Sensor",  "%4.2f", colors2.alpha);
 
-        // Stop all motors
-        leftDrive.setPower(0);
-        rightDrive.setPower(0);
+        telemetry.addData("------------------------", "--------------");
+
+        telemetry.addData("Heading- Target : Current", "%5.2f : %5.0f", targetHeading, getHeading());
+
+        telemetry.addData("Wheel Speeds L : R", "%5.2f : %5.2f", leftSpeed, rightSpeed);
+        telemetry.addData("Error  : Steer Pwr",  "%5.1f : %5.1f", headingError, turnSpeed);
+        telemetry.addData(">", "Robot Heading = %4.0f", getHeading());
+        telemetry.addData("Heading- Target : Current", "%5.2f : %5.0f", targetHeading, getHeading());
+        telemetry.addData("Error  : Steer Pwr",  "%5.1f : %5.1f", headingError, turnSpeed);
+    }
+    double getBrightness1() {
+        NormalizedRGBA colors = colorSensor1.getNormalizedColors();
+        return colors.alpha;
+    }
+    double getBrightness2() {
+        NormalizedRGBA colors = colorSensor2.getNormalizedColors();
+        return colors.alpha;
     }
 
-        // to obtain reflected light, read the normalized values from the color sensor.  Return the Alpha channel.
-        double getBrightness() {
-            NormalizedRGBA colors = colorSensor.getNormalizedColors();
-            telemetry.addData("Light Level (0 to 1)",  "%4.2f", colors.alpha);
-            telemetry.update();
+    private boolean rightSensorCheck() {
+        if (distanceSensorRight.getDistance(DistanceUnit.INCH) < 10) {
+            return true;
+        }
+        if (distanceSensorRight.getDistance(DistanceUnit.INCH) > 10) {
+            return false;
+        }
+        return true;
+    }
+    private boolean leftSensorCheck() {
+        if (distanceSensorLeft.getDistance(DistanceUnit.INCH) < 10) {
+            return true;
+        }
+        if (distanceSensorLeft.getDistance(DistanceUnit.INCH) > 10) {
+            return false;
+        }
+        return true;
+    }
+    private void turnTo(double heading) {
+        turnToHeading(P_TURN_GAIN, heading);
+    }
+    private void setSpeed(double speed) {
+        leftDrive.setPower(speed);
+        rightDrive.setPower(speed);
+    }
 
-            return colors.alpha;
+    private void move(double distance, double turn) {
+        moveRobot(distance, turn);
+    }
+    private void checkLeft() {
+        if (getBrightness1() < whiteThreshold) {
+            encoderDrive(TURN_SPEED, -1, 1, 0.0);
         }
-        private void turnTo(int heading) {
-            turnToHeading(turnSpeed, heading);
+    }
+    private void checkRight() {
+        if (getBrightness2() < whiteThreshold) {
+            encoderDrive(TURN_SPEED, 1, -1, 0.0);
         }
-        private void checkforline(int degreesOfCheck) {
-            turnTo(-degreesOfCheck);
-            if (getBrightness() > whiteThreshold) {
-                turnTo(degreesOfCheck);
+    }
+
+    //checkBoth() is basically just checkRight + checkLeft.
+    private void checkBoth() {
+        // Check if we need to correct to the left.
+        boolean hasTurnedLeft = false;
+        if (getBrightness1() < whiteThreshold && getBrightness2() > whiteThreshold) {
+            leftDrive.setPower(0.01);
+            rightDrive.setPower(tpower);
+            hasTurnedLeft = true;
+        }
+        if (hasTurnedLeft) {
+            return;
+        }
+        // Check if we need to correct to the right.
+        if (getBrightness2() < whiteThreshold && getBrightness1() > whiteThreshold) {
+            rightDrive.setPower(0.01);
+            leftDrive.setPower(tpower);
+        }
+    }
+    private void checkLineRight(double turn, double adjustment) {
+        getBrightness2();
+        while (getBrightness2() > whiteThreshold) {
+            move(0, -turn);
+        }
+        move(0, -adjustment);
+    }
+    private void rampPower(double increment, double topSpeed) {
+        if (true) {
+            // Keep stepping up until we hit the max value.
+            power += increment ;
+            if (power >= topSpeed ) {
+                power = topSpeed;
             }
         }
-        /**
-         *  Drive in a straight line, on a fixed compass heading (angle), based on encoder counts.
-         *  Move will stop if either of these conditions occur:
-         *  1) Move gets to the desired position
-         *  2) Driver stops the OpMode running.
-         *
-         * @param maxDriveSpeed MAX Speed for forward/rev motion (range 0 to +1.0) .
-         * @param distance   Distance (in inches) to move from current position.  Negative distance means move backward.
-         * @param heading      Absolute Heading Angle (in Degrees) relative to last gyro reset.
-         *                   0 = fwd. +ve is CCW from fwd. -ve is CW from forward.
-         *                   If a relative angle is required, add/subtract from the current robotHeading.
-         */
+
+    }
+
+
+
+    /**
+     *  Drive in a straight line, on a fixed compass heading (angle), based on encoder counts.
+     *  Move will stop if either of these conditions occur:
+     *  1) Move gets to the desired position
+     *  2) Driver stops the OpMode running.
+     *
+     * @param maxDriveSpeed MAX Speed for forward/rev motion (range 0 to +1.0) .
+     * @param distance   Distance (in inches) to move from current position.  Negative distance means move backward.
+     * @param heading      Absolute Heading Angle (in Degrees) relative to last gyro reset.
+     *                   0 = fwd. +ve is CCW from fwd. -ve is CW from forward.
+     *                   If a relative angle is required, add/subtract from the current robotHeading.
+     */
     public void driveStraight(double maxDriveSpeed,
                               double distance,
                               double heading) {
@@ -409,5 +474,57 @@ public class FollowTheLine extends LinearOpMode {
         YawPitchRollAngles orientation = imu.getRobotYawPitchRollAngles();
         return orientation.getYaw(AngleUnit.DEGREES);
     }
-}
+    public void encoderDrive(double speed,
+                             double leftInches, double rightInches,
+                             double timeoutS) {
+        int newLeftTarget;
+        int newRightTarget;
 
+        // Ensure that the OpMode is still active
+        if (opModeIsActive()) {
+
+            // Determine new target position, and pass to motor controller
+            newLeftTarget = leftDrive.getCurrentPosition() + (int) (leftInches * COUNTS_PER_INCH);
+            newRightTarget = rightDrive.getCurrentPosition() + (int) (rightInches * COUNTS_PER_INCH);
+            leftDrive.setTargetPosition(newLeftTarget);
+            rightDrive.setTargetPosition(newRightTarget);
+
+            // Turn On RUN_TO_POSITION
+            leftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            rightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+            // reset the timeout time and start motion.
+            runtime.reset();
+            leftDrive.setPower(Math.abs(speed));
+            rightDrive.setPower(Math.abs(speed));
+
+            // keep looping while we are still active, and there is time left, and both motors are running.
+            // Note: We use (isBusy() && isBusy()) in the loop test, which means that when EITHER motor hits
+            // its target position, the motion will stop.  This is "safer" in the event that the robot will
+            // always end the motion as soon as possible.
+            // However, if you require that BOTH motors have finished their moves before the robot continues
+            // onto the next step, use (isBusy() || isBusy()) in the loop test.
+            while (opModeIsActive() &&
+                    (runtime.seconds() < timeoutS) &&
+                    (leftDrive.isBusy() && rightDrive.isBusy())) {
+
+                // Display it for the driver.
+                telemetry.addData("Running to", " %7d :%7d", newLeftTarget, newRightTarget);
+                telemetry.addData("Currently at", " at %7d :%7d",
+                        leftDrive.getCurrentPosition(), rightDrive.getCurrentPosition());
+                telemetry.update();
+            }
+
+            // Stop all motion;
+            leftDrive.setPower(0);
+            rightDrive.setPower(0);
+
+            // Turn off RUN_TO_POSITION
+            leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+            sleep(250);   // optional pause after each move.
+        }
+
+    }
+}

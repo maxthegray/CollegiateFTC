@@ -29,7 +29,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.firstinspires.ftc.teamcode.AutonomousBot;
+package org.firstinspires.ftc.teamcode.AutonomousBot.firstAssignment;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -80,10 +80,10 @@ public class AutoSquare extends LinearOpMode {
     public void runOpMode() {
 
         // Initialize the drive system variables.
-        leftDrive = hardwareMap.get(DcMotor.class, "leftBackMotor");
-        rightDrive = hardwareMap.get(DcMotor.class, "rightBackMotor");
+        leftDrive = hardwareMap.get(DcMotor.class, "left_drive");
+        rightDrive = hardwareMap.get(DcMotor.class, "right_drive");
         sensorDistanceLeft = hardwareMap.get(DistanceSensor.class, "sensor_distance2");
-        colorSensor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor");
+        colorSensor = hardwareMap.get(NormalizedColorSensor.class, "sensor_colo");
 
         // To drive forward, most robots need the motor on one side to be reversed, because the axles point 4n opposite directions.
         // When run, this OpMode should start both motors driving forward. So adjust these two lines based on your first test drive.

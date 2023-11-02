@@ -30,6 +30,7 @@
 package org.firstinspires.ftc.robotcontroller.external.samples;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
@@ -60,7 +61,7 @@ import com.qualcomm.robotcore.hardware.SwitchableLight;
  */
 
 @Autonomous(name="Robot: Auto Drive To Line", group="Robot")
-//@Disabled
+@Disabled
 public class RobotAutoDriveToLine_Linear extends LinearOpMode {
 
     /* Declare OpMode members. */
@@ -77,8 +78,8 @@ public class RobotAutoDriveToLine_Linear extends LinearOpMode {
     public void runOpMode() {
 
         // Initialize the drive system variables.
-        leftDrive  = hardwareMap.get(DcMotor.class, "leftBackMotor");
-        rightDrive = hardwareMap.get(DcMotor.class, "rightBackMotor");
+        leftDrive  = hardwareMap.get(DcMotor.class, "left_drive");
+        rightDrive = hardwareMap.get(DcMotor.class, "right_drive");
 
         // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
         // When run, this OpMode should start both motors driving forward. So adjust these two lines based on your first test drive.
@@ -93,7 +94,7 @@ public class RobotAutoDriveToLine_Linear extends LinearOpMode {
         // Get a reference to our sensor object. It's recommended to use NormalizedColorSensor over
         // ColorSensor, because NormalizedColorSensor consistently gives values between 0 and 1, while
         // the values you get from ColorSensor are dependent on the specific sensor you're using.
-        colorSensor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor");
+        colorSensor = hardwareMap.get(NormalizedColorSensor.class, "sensor_color");
 
         // If necessary, turn ON the white LED (if there is no LED switch on the sensor)
         if (colorSensor instanceof SwitchableLight) {

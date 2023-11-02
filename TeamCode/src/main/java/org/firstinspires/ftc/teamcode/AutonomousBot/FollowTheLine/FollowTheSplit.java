@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.firstinspires.ftc.teamcode.AutonomousBot;
+package org.firstinspires.ftc.teamcode.AutonomousBot.FollowTheLine;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
@@ -66,7 +66,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
  *   Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
  */
 
-@Autonomous(name="Robot: Follow The Line Left/Right", group="Robot")
+@Autonomous(name="FTL: Follow The Split (bleh dont use its bad im superior to whoever made this (me last week i just found another sensor))", group="FTL")
 //@Disabled
 public class FollowTheSplit extends LinearOpMode {
 
@@ -86,8 +86,8 @@ public class FollowTheSplit extends LinearOpMode {
     private int     rightTarget   = 0;
 
     static final double whiteThreshold = 0.5;  // spans between 0.0 - 1.0 from dark to light
-    static final double splitThresholdLow = 0.7;
-    static final double splitThresholdHigh = 0.8;
+    static final double splitThresholdLow = 0.70;
+    static final double splitThresholdHigh = 0.80;
     static final double     COUNTS_PER_MOTOR_REV    = 1440 ;
     static final double     DRIVE_GEAR_REDUCTION    = 1.0 ; //no external gearing
     static final double     WHEEL_DIAMETER_INCHES   = 4.0 ;     // For figuring circumference
@@ -97,7 +97,7 @@ public class FollowTheSplit extends LinearOpMode {
     static final double     DRIVE_SPEED             = .3;     // Max driving speed for better distance accuracy.
     static final double     TURN_SPEED              = 0.3;     // Max Turn speed to limit turn rate
 
-    static final double     HEADING_THRESHOLD       = 0.01 ;    // How close must the heading get to the target before moving to next step.
+    static final double     HEADING_THRESHOLD       = 0.1 ;    // How close must the heading get to the target before moving to next step.
 
     static final double     P_TURN_GAIN            = 0.02;     // Larger is more responsive, but also less stable
     static final double     P_DRIVE_GAIN           = 0.3;     // Larger is more responsive, but also less stable
@@ -106,10 +106,10 @@ public class FollowTheSplit extends LinearOpMode {
     public void runOpMode() {
 
         // Initialize the drive system variables.
-        leftDrive  = hardwareMap.get(DcMotor.class, "leftBackMotor");
-        rightDrive = hardwareMap.get(DcMotor.class, "rightBackMotor");
+        leftDrive  = hardwareMap.get(DcMotor.class, "left_drive");
+        rightDrive = hardwareMap.get(DcMotor.class, "right_drive");
         imu = hardwareMap.get(IMU.class, "imu");
-        colorSensor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor");
+        colorSensor = hardwareMap.get(NormalizedColorSensor.class, "sensor_color");
         // Get a reference to our sensor object. It's recommended to use NormalizedColorSensor over
         // ColorSensor, because NormalizedColorSensor consistently gives values between 0 and 1, while
         // the values you get from ColorSensor are dependent on the specific sensor you're using.
@@ -119,9 +119,7 @@ public class FollowTheSplit extends LinearOpMode {
         RevHubOrientationOnRobot orientationOnRobot = new RevHubOrientationOnRobot(logoDirection, usbDirection);
         imu.initialize(new IMU.Parameters(orientationOnRobot));
 
-        // If there are encoders connected, switch to RUN_USING_ENCODER mode for greater accuracy
-        leftDrive.setDirection(DcMotor.Direction.REVERSE);
-        rightDrive.setDirection(DcMotor.Direction.FORWARD);
+
         leftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         rightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         leftDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -149,12 +147,12 @@ public class FollowTheSplit extends LinearOpMode {
         colorSensor.setGain(15);
 
         // Wait for driver to press PLAY)
-        // Abort this loop is started or stopped.
+        // Abort this loop is started or stopped.hy
         while (opModeInInit()) {
-            if (getBrightness() < whiteThreshold) {
-                telemetry.addData("Status", "Line is Detected");
+            if (splitThresholdHigh > getBrightness() && getBrightness() < splitThresholdLow) {
+                telemetry.addData("Status", "on the split");
             } else {
-                telemetry.addData("Status","Line Is Not Detected");
+                telemetry.addData("Status","not on the split");
             }
             telemetry.addData(">", "Robot Heading = %4.0f", getHeading());
             telemetry.update();
@@ -167,11 +165,15 @@ public class FollowTheSplit extends LinearOpMode {
             if (splitThresholdHigh > getBrightness() && getBrightness() > splitThresholdLow) {
                 leftDrive.setPower(driveSpeed);
                 rightDrive.setPower(driveSpeed);
-            } else if(getBrightness() > splitThresholdLow) {
+            } else if(getBrightness() < splitThresholdLow) {
                 checkLeft();
                 imu.resetYaw();
-            } else {
+            } else if(getBrightness() > splitThresholdHigh){
                 checkRight();
+                imu.resetYaw();
+            }
+            else {
+                telemetry.addData("Somethings", "Wrong");
             }
         }
 
@@ -189,16 +191,18 @@ public class FollowTheSplit extends LinearOpMode {
         return colors.alpha;
     }
     private void checkLeft() {
-        while(splitThresholdLow > getBrightness())
+        while (splitThresholdLow > getBrightness()) {
             imu.resetYaw();
             driveStraight(DRIVE_SPEED, 1, 0);
             turnToHeading(TURN_SPEED, 5);
+        }
     }
     private void checkRight() {
-        while(getBrightness() > splitThresholdHigh)
+        while(getBrightness() > splitThresholdHigh) {
             imu.resetYaw();
             driveStraight(DRIVE_SPEED, 1, 0);
             turnToHeading(TURN_SPEED, -5);
+        }
     }
     private void turnTo(int heading) {
         turnToHeading(TURN_SPEED, heading);

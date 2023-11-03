@@ -17,7 +17,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
 
-@Autonomous(name="FTL: betweenies w/o gyro (main)", group="FTL")
+@Autonomous(name="FTL: main switch", group="FTL")
 //@Disabled
 public class FTLmain extends LinearOpMode {
 
@@ -29,8 +29,8 @@ public class FTLmain extends LinearOpMode {
     private IMU imu         = null;
     NormalizedColorSensor colorSensor1;
     NormalizedColorSensor colorSensor2;
-    private DistanceSensor distanceSensorLeft;
-    private DistanceSensor distanceSensorRight;
+    private DistanceSensor distanceSensor1;
+    private DistanceSensor distanceSensor2;
     ElapsedTime runtime = new ElapsedTime();
 
     private double  targetHeading = 0;
@@ -42,9 +42,10 @@ public class FTLmain extends LinearOpMode {
     private int     rightTarget   = 0;
     double power = 0;
     double tpower = 0;
-    boolean movingforward = true;
+    double leftPow = 0.1;
+    double rightPow = 0.1;
     
-    static final double whiteThreshold = 0.20;  // spans between 0.0 - 1.0 from dark to light
+    static final double whiteThreshold = 0.14;  // spans between 0.0 - 1.0 from dark to light
 
     static final double     COUNTS_PER_MOTOR_REV    = 1440 ;
     static final double     DRIVE_GEAR_REDUCTION    = 1.0 ; //no external gearing
@@ -72,8 +73,8 @@ public class FTLmain extends LinearOpMode {
         imu = hardwareMap.get(IMU.class, "imu");
         colorSensor1 = hardwareMap.get(NormalizedColorSensor.class, "sensor_color1");
         colorSensor2 = hardwareMap.get(NormalizedColorSensor.class, "sensor_color2");
-        distanceSensorLeft = hardwareMap.get(DistanceSensor.class, "sensor_distance");
-        distanceSensorRight = hardwareMap.get(DistanceSensor.class, "sensor_distance2");
+        distanceSensor1 = hardwareMap.get(DistanceSensor.class, "sensor_distance");
+        distanceSensor2 = hardwareMap.get(DistanceSensor.class, "sensor_distance2");
 
 
         RevHubOrientationOnRobot.LogoFacingDirection logoDirection = RevHubOrientationOnRobot.LogoFacingDirection.UP;
@@ -124,8 +125,11 @@ public class FTLmain extends LinearOpMode {
 
             imu.resetYaw();
         }
-        power = 0.1;
-        tpower = 0.0;
+        power = 0.2;
+        tpower = -0.2;
+        leftPow = 0.1;
+        rightPow = 0.1;
+        boolean manual = false;
         //with gyro motion
         waitForStart();
 
@@ -137,40 +141,49 @@ public class FTLmain extends LinearOpMode {
 
             telemetry.update();
             if (rightSensorCheck() && leftSensorCheck()) {
-                rightDrive.setPower(0);
-                leftDrive.setPower(0);
+                setSpeed(0);
                 telemetry.addData("Switching", "Manual");
-
-                sleep(100);
-
-                while(!rightSensorCheck() && !leftSensorCheck()) {
-
-//                    if (rightSensorCheck()) {
-//                        leftDrive.setPower(tpower);
-//                        rightDrive.setPower(power);
-//                    }
-//                    else if (leftSensorCheck()) {
-//                        leftDrive.setPower(power);
-//                        rightDrive.setPower(tpower);
-                    if (!rightSensorCheck() && !leftSensorCheck()) {
-                        encoderDrive(0.3,-0.5,0.5,0.25);
-                    } else if (rightSensorCheck()) {
-                        encoderDrive(0.1,-1.15,1,0.25);
-                    } else if (leftSensorCheck()) {
-                        encoderDrive(0.1,1,-1.15,0.25);
-                    } else {
-                        encoderDrive(0.3,1,1,0.25);
-                   }
-                    telemetry.addData("Switching", "Automatic");
-                    sleep(50);
+                telemetry.update();
+                sleep(1000);
+                manual = true; 
+                while (opModeIsActive() && manual == true) {
+                    leftPow = 0.1;
+                    rightPow = 0.1;
+                    if (rightSensorCheck() && leftSensorCheck()) {
+                        manual = false;
+                        telemetry.addData("Switching", "Automatic");
+                        telemetry.update();
+                        sleep(1000);
+                    } while((rightSensorCheck() && opModeIsActive() && !leftSensorCheck() && manual) == true) {
+                        encoderDrive(0.1, rightPow, -rightPow, 0.20);
+                        rampRight(0.25, 10);
+                    } while (leftSensorCheck() && opModeIsActive() && !rightSensorCheck() && manual == true) {
+                        encoderDrive(0.1, -leftPow, leftPow, 0.20);
+                        rampLeft(0.25, 10);
+                    } if (!leftSensorCheck() && !rightSensorCheck() && opModeIsActive() && manual == true) {
+                        encoderDrive(0.1, 0.5, 0.5, 0.5);
+                    }
                 }
-            } else if (getBrightness1() < whiteThreshold && getBrightness2() > whiteThreshold) {
-                encoderDrive(0.1,-2.15,2,0.25);
-            } else if (getBrightness2() < whiteThreshold && getBrightness1() > whiteThreshold) {
-                encoderDrive(0.1,2,-2.15,0.25);
-             } else {
-                encoderDrive(0.3,0.75,0.75,0.25);
-            }
+
+
+                 } else if (getBrightness1() < whiteThreshold && getBrightness2() > whiteThreshold) {
+                     checkLeft();
+                 } else if (getBrightness2() < whiteThreshold && getBrightness1() > whiteThreshold) {
+                     checkRight();
+                
+//Current issue is the color sensors sensing weird. This might be fixed with either putting the 
+//color sensors back where it was so it doesnt reflext the light unevenly, hiding the wires so that they read evenly,reorganizing wire managments,
+//or using something to cover the top consistantly. Once the sensors read equally guage the white threshold and then 
+//either use the currently implimented code or go back to the code above for smoother, less sharp turns.
+
+                // } else if (getBrightness1() < whiteThreshold && getBrightness2() > whiteThreshold) {
+                //     checkLeftDime();
+                // } else if (getBrightness2() < whiteThreshold && getBrightness1() > whiteThreshold) {
+                //     checkRightDime();
+                } else {
+                    setSpeed(power);
+                }
+
         }
     }
     private void doAllTelemetry() {
@@ -199,22 +212,28 @@ public class FTLmain extends LinearOpMode {
     }
 
     private boolean rightSensorCheck() {
-        if (distanceSensorRight.getDistance(DistanceUnit.INCH) < 10) {
+        if (distanceSensor2.getDistance(DistanceUnit.INCH) < 10) {
             return true;
         }
-        if (distanceSensorRight.getDistance(DistanceUnit.INCH) > 10) {
+        if (distanceSensor2.getDistance(DistanceUnit.INCH) > 10) {
             return false;
         }
         return true;
     }
     private boolean leftSensorCheck() {
-        if (distanceSensorLeft.getDistance(DistanceUnit.INCH) < 10) {
+        if (distanceSensor1.getDistance(DistanceUnit.INCH) < 10) {
             return true;
         }
-        if (distanceSensorLeft.getDistance(DistanceUnit.INCH) > 10) {
+        if (distanceSensor1.getDistance(DistanceUnit.INCH) > 10) {
             return false;
         }
         return true;
+    }
+    private void checkLeftDime() {
+            encoderDrive(0.1, -2, 0, 0.25);
+    }
+    private void checkRightDime() {
+            encoderDrive(0.1, 0, -2, 0.25);
     }
     private void turnTo(double heading) {
         turnToHeading(P_TURN_GAIN, heading);
@@ -229,13 +248,13 @@ public class FTLmain extends LinearOpMode {
     }
     private void checkLeft() {
         if (getBrightness1() < whiteThreshold) {
-            rightDrive.setPower(0.3);
+            rightDrive.setPower(0);
             leftDrive.setPower(tpower);
         }
     }
     private void checkRight() {
         if (getBrightness2() < whiteThreshold) {
-            leftDrive.setPower(0.3);
+            leftDrive.setPower(0);
             rightDrive.setPower(tpower);
         }
     }
@@ -276,6 +295,27 @@ public class FTLmain extends LinearOpMode {
 
     }
 
+    private void rampLeft(double increment, double topSpeed) {
+        if (true) {
+            // Keep stepping up until we hit the max value.
+            leftPow += increment ;
+            if (leftPow >= topSpeed ) {
+                leftPow = topSpeed;
+            }
+        }
+
+    }
+
+    private void rampRight(double increment, double topSpeed) {
+        if (true) {
+            // Keep stepping up until we hit the max value.
+            rightPow += increment ;
+            if (rightPow >= topSpeed ) {
+                rightPow = topSpeed;
+            }
+        }
+
+    }
 
 
     /**

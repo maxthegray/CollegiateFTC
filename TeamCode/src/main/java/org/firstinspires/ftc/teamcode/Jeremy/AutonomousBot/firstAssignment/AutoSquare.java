@@ -32,6 +32,7 @@
 package org.firstinspires.ftc.teamcode.AutonomousBot.firstAssignment;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
@@ -46,7 +47,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 
 @Autonomous(name="ChairTrack: Colorsensor", group="Robot")
-//@Disabled
+@Disabled
 public class AutoSquare extends LinearOpMode {
     private DistanceSensor sensorDistanceFront;
     private DistanceSensor sensorDistanceLeft;

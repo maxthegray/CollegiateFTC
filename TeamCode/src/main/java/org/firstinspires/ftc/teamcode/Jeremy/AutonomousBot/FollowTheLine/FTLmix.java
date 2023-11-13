@@ -1,14 +1,15 @@
-
-package org.firstinspires.ftc.teamcode.AutonomousBot.firstAssignment;
+package org.firstinspires.ftc.teamcode.AutonomousBot.FollowTheLine;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 import com.qualcomm.robotcore.hardware.NormalizedRGBA;
+import com.qualcomm.robotcore.hardware.SwitchableLight;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
@@ -17,66 +18,66 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
 
-@Autonomous(name="ChairTrack: Gyro", group="Robot")
-//@Disabled
-public class GyroDrive extends LinearOpMode {
+@Autonomous(name="FTL: encoderdrive colorsensor", group="FTL")
+@Disabled
+public class FTLmix extends LinearOpMode {
 
     /* Declare OpMode members. */
-    private DcMotor         leftDrive   = null;
-    private DcMotor         rightDrive  = null;
-    private IMU             imu         = null;      // Control/Expansion Hub IMU
-    private ElapsedTime     runtime = new ElapsedTime();
-    private DistanceSensor sensorDistanceFront;
-
-    NormalizedColorSensor colorSensor;
-
     private double          headingError  = 0;
 
-    // These variable are declared here (as class members) so they can be updated in various methods,
-    // but still be displayed by sendTelemetry()
+    private DcMotor         leftDrive   = null;
+    private DcMotor         rightDrive  = null;
+    private IMU imu         = null;
+    NormalizedColorSensor colorSensor1;
+    NormalizedColorSensor colorSensor2;
+    private DistanceSensor distanceSensorLeft;
+    private DistanceSensor distanceSensorRight;
+    private ElapsedTime     runtime = new ElapsedTime();
+
+
     private double  targetHeading = 0;
     private double  driveSpeed    = 0;
-    private double  turnSpeed     = 0;
+    private double turnSpeed = 0;
     private double  leftSpeed     = 0;
     private double  rightSpeed    = 0;
     private int     leftTarget    = 0;
     private int     rightTarget   = 0;
+    double power = 0;
+    double tpower = 0;
+    double apower = 0;
+    boolean movingforward = true;
 
-    // Calculate the COUNTS_PER_INCH for your specific drive train.
-    // Go to your motor vendor website to determine your motor's COUNTS_PER_MOTOR_REV
-    // For external drive gearing, set DRIVE_GEAR_REDUCTION as needed.
-    // For example, use a value of 2.0 for a 12-tooth spur gear driving a 24-tooth spur gear.
-    // This is gearing DOWN for less speed and more torque.
-    // For gearing UP, use a gear ratio less than 1.0. Note this will affect the direction of wheel rotation.
+    static final double whiteThreshold = 0.20;  // spans between 0.0 - 1.0 from dark to light
+
     static final double     COUNTS_PER_MOTOR_REV    = 1440 ;
     static final double     DRIVE_GEAR_REDUCTION    = 1.0 ; //no external gearing
     static final double     WHEEL_DIAMETER_INCHES   = 4.0 ;     // For figuring circumference
     static final double     COUNTS_PER_INCH         = (COUNTS_PER_MOTOR_REV * DRIVE_GEAR_REDUCTION) /
             (WHEEL_DIAMETER_INCHES * 3.1415);
 
-    // These constants define the desired driving/control characteristics
-    // They can/should be tweaked to suit the specific robot drive train.
-    static final double     DRIVE_SPEED             = .3;     // Max driving speed for better distance accuracy.
+    static final double     DRIVE_SPEED             = 0.3;     // Max driving speed for better distance accuracy.
     static final double     TURN_SPEED              = 0.1;     // Max Turn speed to limit turn rate
-    static final double GROUND_BRIGHTNESS = 0.85;  // spans between 0.0 - 1.0 from dark to light
 
-    static final double     HEADING_THRESHOLD       = 0.01 ;    // How close must the heading get to the target before moving to next step.
-    // Requiring more accuracy (a smaller number) will often make the turn take longer to get into the final position.
-    // Define the Proportional control coefficient (or GAIN) for "heading control".
-    // We define one value when Turning (larger errors), and the other is used when Driving straight (smaller errors).
-    // Increase these numbers if the heading does not corrects strongly enough (eg: a heavy robot or using tracks)
-    // Decrease these numbers if the heading does not settle on the correct value (eg: very agile robot with omni wheels)
+    static final double     HEADING_THRESHOLD       = 1.0 ;    // How close must the heading get to the target before moving to next step.
+
     static final double     P_TURN_GAIN            = 0.02;     // Larger is more responsive, but also less stable
-    static final double     P_DRIVE_GAIN           = 0.3;     // Larger is more responsive, but also less stable
-
+    static final double     P_DRIVE_GAIN           = 0.03;     // Larger is more responsive, but also less stable
+    ElapsedTime getOut = new ElapsedTime();
 
     @Override
     public void runOpMode() {
-        //imu things
+
+        // initialize the drive variables.
+//            Robot robot = new Robot(hardwareMap, new Movement()); stoopid i hate java
+        // TO MAX: once you've moved all the code:
         leftDrive = hardwareMap.get(DcMotor.class, "left_drive");
         rightDrive = hardwareMap.get(DcMotor.class, "right_drive");
-        sensorDistanceFront = hardwareMap.get(DistanceSensor.class, "sensor_distance2");
         imu = hardwareMap.get(IMU.class, "imu");
+        colorSensor1 = hardwareMap.get(NormalizedColorSensor.class, "sensor_color1");
+        colorSensor2 = hardwareMap.get(NormalizedColorSensor.class, "sensor_color2");
+        distanceSensorLeft = hardwareMap.get(DistanceSensor.class, "sensor_distance");
+        distanceSensorRight = hardwareMap.get(DistanceSensor.class, "sensor_distance2");
+
 
         RevHubOrientationOnRobot.LogoFacingDirection logoDirection = RevHubOrientationOnRobot.LogoFacingDirection.UP;
         RevHubOrientationOnRobot.UsbFacingDirection usbDirection = RevHubOrientationOnRobot.UsbFacingDirection.FORWARD;
@@ -90,81 +91,169 @@ public class GyroDrive extends LinearOpMode {
         leftDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        // Set the encoders for closed loop speed control, and reset the heading.
         leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        imu.resetYaw();
+
+        if (colorSensor1 instanceof SwitchableLight) {
+            ((SwitchableLight) colorSensor1).enableLight(true);
+        }
+        if (colorSensor2 instanceof SwitchableLight) {
+            ((SwitchableLight) colorSensor1).enableLight(true);
+        }
+
+
+        colorSensor1.setGain(15);
+        colorSensor2.setGain(15);
+
 
         while (opModeInInit()) {
-            telemetry.addData("Starting at", "%7d :%7d",
-                    leftDrive.getCurrentPosition(),
-                    rightDrive.getCurrentPosition());
-            telemetry.addData("Starting at", "%7d :%7d");
-            telemetry.addData(">", "Robot Heading = %4.0f", getHeading());
+
+            if (getBrightness1() > whiteThreshold && getBrightness2() > whiteThreshold) {
+                telemetry.addData("Status", "In between line, ready to go");
+            } else if (getBrightness1() < whiteThreshold && getBrightness2() < whiteThreshold) {
+                telemetry.addData("Status", "above white threshold on both sensors");
+
+            } else if (getBrightness1() < whiteThreshold && getBrightness2() > whiteThreshold) {
+                telemetry.addData("Status", "above white threshold on color sensor 1");
+            } else if (getBrightness1() > whiteThreshold && getBrightness2() < whiteThreshold) {
+                telemetry.addData("Status", "above white threshold on color sensor 2");
+            } else {
+                telemetry.addData("Status", "error of some sort");
+            }
+
+            doAllTelemetry();
             telemetry.update();
+
             imu.resetYaw();
+        }
+        power = 0.1;
+        tpower = 0.2;
+        apower = 0.3;
+        waitForStart();
 
-            while (allowedToMove()) {
+        while (opModeIsActive()) {
+            doAllTelemetry();
 
-                telemetry.addData(">", "Robot Heading = %4.0f", getHeading());
-                telemetry.update();
+            telemetry.update();
 
-                if(!notEnoughDistanceInFront()) {
-                    move(5, 0);
-                } else if(notEnoughDistanceInFront()) {
-                    move(40,0);
-                    goAroundStool();
-                    move(116, 0);
-                }
+            imu.resetYaw();
+//            if (distanceSensorLeft.getDistance(DistanceUnit.INCH) < 5) {
+//                encoderDrive(TURN_SPEED,-1,1,0);
+//            }
+//            if (distanceSensorRight.getDistance(DistanceUnit.INCH) < 5) {
+//                encoderDrive(TURN_SPEED,-1,1,0);
+//            }
+            if (getBrightness1() < whiteThreshold && getBrightness2() < whiteThreshold) {
+                encoderDrive(DRIVE_SPEED, 0.5, 0.5, 0.25);
+            }
+            else if (getBrightness1() < whiteThreshold && getBrightness2() > whiteThreshold) {
+                encoderDrive(TURN_SPEED, -1.5, 1, 0.25);
+            } else if (getBrightness2() < whiteThreshold && getBrightness1() > whiteThreshold) {
+                encoderDrive(TURN_SPEED, 1, -1.5, 0.25);
+            } else {
+                encoderDrive(DRIVE_SPEED, 2, 2, 0.25);
             }
         }
+    }
+    private void doAllTelemetry() {
+        NormalizedRGBA colors1 = colorSensor1.getNormalizedColors();
+        telemetry.addData("Light Level (0 to 1)Left Sensor",  "%4.2f", colors1.alpha);
+        NormalizedRGBA colors2 = colorSensor2.getNormalizedColors();
+        telemetry.addData("Light Level (0 to 1) Right Sensor",  "%4.2f", colors2.alpha);
 
+        telemetry.addData("------------------------", "--------------");
 
+        telemetry.addData("Heading- Target : Current", "%5.2f : %5.0f", targetHeading, getHeading());
+        telemetry.addData("Wheel Speeds L : R", "%5.2f : %5.2f", leftSpeed, rightSpeed);
 
     }
-        private boolean allowedToMove() {
-            return opModeIsActive();
-        }
-//Color Stuff
-        private boolean tapeIsntThere() {
-            return getBrightness() > GROUND_BRIGHTNESS;
-        }
-        public void turnTo(double degrees) {
-            turnToHeading(TURN_SPEED, degrees);
-        }
-        private void goAroundStool() {
-            imu.resetYaw();
-            turnTo(-90);
-            move(39, -90);
-            imu.resetYaw();
-            turnTo(-90);
-            move(37, -90);
-        }
-        private boolean notEnoughDistanceInFront() {
-            return sensorDistanceFront.getDistance(DistanceUnit.INCH) <= 32;
-        }
-        double getBrightness() {
-            NormalizedRGBA colors = colorSensor.getNormalizedColors();
-            telemetry.addData("Light Level (0 to 1)",  "%4.2f", colors.alpha);
-            telemetry.update();
+    double getBrightness1() {
+        NormalizedRGBA colors = colorSensor1.getNormalizedColors();
+        return colors.alpha;
+    }
+    double getBrightness2() {
+        NormalizedRGBA colors = colorSensor2.getNormalizedColors();
+        return colors.alpha;
+    }
 
-            return colors.alpha;
+    private boolean rightSensorCheck() {
+        if (distanceSensorRight.getDistance(DistanceUnit.INCH) < 10) {
+            return true;
         }
-        private void turn(int degrees) {
-            turnToHeading(TURN_SPEED, degrees);
+        if (distanceSensorRight.getDistance(DistanceUnit.INCH) > 10) {
+            return false;
+        }
+        return true;
+    }
+    private boolean leftSensorCheck() {
+        if (distanceSensorLeft.getDistance(DistanceUnit.INCH) < 10) {
+            return true;
+        }
+        if (distanceSensorLeft.getDistance(DistanceUnit.INCH) > 10) {
+            return false;
+        }
+        return true;
+    }
+    private void turnTo(double heading) {
+        turnToHeading(P_TURN_GAIN, heading);
+    }
+    private void setSpeed(double speed) {
+        leftDrive.setPower(speed);
+        rightDrive.setPower(speed);
+    }
+
+    private void move(double distance, double turn) {
+        moveRobot(distance, turn);
+    }
+    private void checkLeft() {
+        if (getBrightness1() < whiteThreshold) {
+            encoderDrive(TURN_SPEED, -1, 1, 0.0);
+        }
+    }
+    private void checkRight() {
+        if (getBrightness2() < whiteThreshold) {
+            encoderDrive(TURN_SPEED, 1, -1, 0.0);
+        }
+    }
+
+    //checkBoth() is basically just checkRight + checkLeft.
+    private void checkBoth() {
+        // Check if we need to correct to the left.
+        boolean hasTurnedLeft = false;
+        if (getBrightness1() < whiteThreshold && getBrightness2() > whiteThreshold) {
+            leftDrive.setPower(0.01);
+            rightDrive.setPower(tpower);
+            hasTurnedLeft = true;
+        }
+        if (hasTurnedLeft) {
+            return;
+        }
+        // Check if we need to correct to the right.
+        if (getBrightness2() < whiteThreshold && getBrightness1() > whiteThreshold) {
+            rightDrive.setPower(0.01);
+            leftDrive.setPower(tpower);
+        }
+    }
+    private void checkLineRight(double turn, double adjustment) {
+        getBrightness2();
+        while (getBrightness2() > whiteThreshold) {
+            move(0, -turn);
+        }
+        move(0, -adjustment);
+    }
+    private void rampPower(double increment, double topSpeed) {
+        if (true) {
+            // Keep stepping up until we hit the max value.
+            power += increment ;
+            if (power >= topSpeed ) {
+                power = topSpeed;
             }
-        private void move(int distance, int angle) {
-        driveStraight(DRIVE_SPEED, distance, angle);  // Drive Forward 17" at -45 degrees (12"x and 12"y)
-
         }
 
-    /*
-     * ====================================================================================================
-     * Driving "Helper" functions are below this line.
-     * These provide the high and low level methods that handle driving straight and turning.
-     * ====================================================================================================
-     */
+    }
 
-    // **********  HIGH Level driving functions.  ********************
+
 
     /**
      *  Drive in a straight line, on a fixed compass heading (angle), based on encoder counts.
@@ -253,7 +342,7 @@ public class GyroDrive extends LinearOpMode {
             turnSpeed = getSteeringCorrection(heading, P_TURN_GAIN);
 
             // Clip the speed to the maximum permitted value.
-            turnSpeed = Range.clip(turnSpeed, -maxTurnSpeed, maxTurnSpeed);
+            turnSpeed = Range.clip(turnSpeed, -turnSpeed, turnSpeed);
 
             // Pivot in place by applying the turning correction
             moveRobot(0, turnSpeed);
@@ -379,5 +468,58 @@ public class GyroDrive extends LinearOpMode {
     public double getHeading() {
         YawPitchRollAngles orientation = imu.getRobotYawPitchRollAngles();
         return orientation.getYaw(AngleUnit.DEGREES);
+    }
+    public void encoderDrive(double speed,
+                             double leftInches, double rightInches,
+                             double timeoutS) {
+        int newLeftTarget;
+        int newRightTarget;
+
+        // Ensure that the OpMode is still active
+        if (opModeIsActive()) {
+
+            // Determine new target position, and pass to motor controller
+            newLeftTarget = leftDrive.getCurrentPosition() + (int) (leftInches * COUNTS_PER_INCH);
+            newRightTarget = rightDrive.getCurrentPosition() + (int) (rightInches * COUNTS_PER_INCH);
+            leftDrive.setTargetPosition(newLeftTarget);
+            rightDrive.setTargetPosition(newRightTarget);
+
+            // Turn On RUN_TO_POSITION
+            leftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            rightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+            // reset the timeout time and start motion.
+            runtime.reset();
+            leftDrive.setPower(Math.abs(speed));
+            rightDrive.setPower(Math.abs(speed));
+
+            // keep looping while we are still active, and there is time left, and both motors are running.
+            // Note: We use (isBusy() && isBusy()) in the loop test, which means that when EITHER motor hits
+            // its target position, the motion will stop.  This is "safer" in the event that the robot will
+            // always end the motion as soon as possible.
+            // However, if you require that BOTH motors have finished their moves before the robot continues
+            // onto the next step, use (isBusy() || isBusy()) in the loop test.
+            while (opModeIsActive() &&
+                    (runtime.seconds() < timeoutS) &&
+                    (leftDrive.isBusy() && rightDrive.isBusy())) {
+
+                // Display it for the driver.
+                telemetry.addData("Running to", " %7d :%7d", newLeftTarget, newRightTarget);
+                telemetry.addData("Currently at", " at %7d :%7d",
+                        leftDrive.getCurrentPosition(), rightDrive.getCurrentPosition());
+                telemetry.update();
+            }
+
+            // Stop all motion;
+            leftDrive.setPower(0);
+            rightDrive.setPower(0);
+
+            // Turn off RUN_TO_POSITION
+            leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+            sleep(250);   // optional pause after each move.
+        }
+
     }
 }

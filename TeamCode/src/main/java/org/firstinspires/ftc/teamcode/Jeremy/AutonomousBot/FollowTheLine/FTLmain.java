@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.AutonomousBot.FollowTheLine;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
@@ -18,7 +19,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
 
 @Autonomous(name="FTL: main switch", group="FTL")
-//@Disabled
+@Disabled
 public class FTLmain extends LinearOpMode {
 
     /* Declare OpMode members. */
@@ -45,7 +46,7 @@ public class FTLmain extends LinearOpMode {
     double leftPow = 0.1;
     double rightPow = 0.1;
     
-    static final double whiteThreshold = 0.14;  // spans between 0.0 - 1.0 from dark to light
+    static final double whiteThreshold = 0.16;  // spans between 0.0 - 1.0 from dark to light
 
     static final double     COUNTS_PER_MOTOR_REV    = 1440 ;
     static final double     DRIVE_GEAR_REDUCTION    = 1.0 ; //no external gearing
@@ -126,7 +127,7 @@ public class FTLmain extends LinearOpMode {
             imu.resetYaw();
         }
         power = 0.2;
-        tpower = -0.2;
+        tpower = -0.1;
         leftPow = 0.1;
         rightPow = 0.1;
         boolean manual = false;
@@ -145,7 +146,8 @@ public class FTLmain extends LinearOpMode {
                 telemetry.addData("Switching", "Manual");
                 telemetry.update();
                 sleep(1000);
-                manual = true; 
+                manual = true;
+innerLoop:
                 while (opModeIsActive() && manual == true) {
                     leftPow = 0.1;
                     rightPow = 0.1;
@@ -154,32 +156,40 @@ public class FTLmain extends LinearOpMode {
                         telemetry.addData("Switching", "Automatic");
                         telemetry.update();
                         sleep(1000);
-                    } while((rightSensorCheck() && opModeIsActive() && !leftSensorCheck() && manual) == true) {
-                        encoderDrive(0.1, rightPow, -rightPow, 0.20);
+                        break innerLoop;
+                    } while(rightSensorCheck() && opModeIsActive() && !leftSensorCheck() && manual == true) {
+                        encoderDrive(0.2, rightPow, -rightPow, 0.20);
                         rampRight(0.25, 10);
                     } while (leftSensorCheck() && opModeIsActive() && !rightSensorCheck() && manual == true) {
-                        encoderDrive(0.1, -leftPow, leftPow, 0.20);
+                        encoderDrive(0.2, -leftPow, leftPow, 0.20);
                         rampLeft(0.25, 10);
                     } if (!leftSensorCheck() && !rightSensorCheck() && opModeIsActive() && manual == true) {
-                        encoderDrive(0.1, 0.5, 0.5, 0.5);
+                        encoderDrive(0.1, 3, 3, 0.5);
                     }
-                }
+               }
 
 
-                 } else if (getBrightness1() < whiteThreshold && getBrightness2() > whiteThreshold) {
-                     checkLeft();
-                 } else if (getBrightness2() < whiteThreshold && getBrightness1() > whiteThreshold) {
-                     checkRight();
-                
+            } else if (getBrightness1() < whiteThreshold && getBrightness2() > whiteThreshold) {
+                checkLeftOld();
+            } else if (getBrightness2() < whiteThreshold && getBrightness1() > whiteThreshold) {
+                checkRightOld();
+
 //Current issue is the color sensors sensing weird. This might be fixed with either putting the 
 //color sensors back where it was so it doesnt reflext the light unevenly, hiding the wires so that they read evenly,reorganizing wire managments,
 //or using something to cover the top consistantly. Once the sensors read equally guage the white threshold and then 
 //either use the currently implimented code or go back to the code above for smoother, less sharp turns.
+//                } else if (getBrightness1() < whiteThreshold) {
+//                    encoderDrive(0.2, -1, 0, 0.50);
+//                } else if (getBrightness2() < whiteThreshold) {
+//                    encoderDrive(0.2, 0, -1, 0.50);
 
-                // } else if (getBrightness1() < whiteThreshold && getBrightness2() > whiteThreshold) {
-                //     checkLeftDime();
-                // } else if (getBrightness2() < whiteThreshold && getBrightness1() > whiteThreshold) {
-                //     checkRightDime();
+//                } else if (getBrightness1() < whiteThreshold) {
+//                    checkLeftOld();
+//                } else if (getBrightness2() < whiteThreshold) {
+//                    checkRightOld();
+
+//
+
                 } else {
                     setSpeed(power);
                 }
@@ -230,10 +240,10 @@ public class FTLmain extends LinearOpMode {
         return true;
     }
     private void checkLeftDime() {
-            encoderDrive(0.1, -2, 0, 0.25);
+            encoderDrive(0.1, -1, 0, 0.50);
     }
     private void checkRightDime() {
-            encoderDrive(0.1, 0, -2, 0.25);
+            encoderDrive(0.1, 0, -1, 0.50);
     }
     private void turnTo(double heading) {
         turnToHeading(P_TURN_GAIN, heading);
@@ -247,18 +257,29 @@ public class FTLmain extends LinearOpMode {
         moveRobot(distance, turn);
     }
     private void checkLeft() {
-        if (getBrightness1() < whiteThreshold) {
-            rightDrive.setPower(0);
+        while (getBrightness1() < whiteThreshold && opModeIsActive()) {
+            rightDrive.setPower(0.01);
             leftDrive.setPower(tpower);
         }
     }
     private void checkRight() {
-        if (getBrightness2() < whiteThreshold) {
-            leftDrive.setPower(0);
+        while (getBrightness2() < whiteThreshold && opModeIsActive()) {
+            leftDrive.setPower(0.01);
             rightDrive.setPower(tpower);
         }
     }
-
+    private void checkLeftOld() {
+        while (getBrightness1() < whiteThreshold && opModeIsActive()) {
+            rightDrive.setPower(1);
+            leftDrive.setPower(0.25);
+        }
+    }
+    private void checkRightOld() {
+        while (getBrightness2() < whiteThreshold && opModeIsActive()) {
+            leftDrive.setPower(1);
+            rightDrive.setPower(0.25);
+        }
+    }
     //checkBoth() is basically just checkRight + checkLeft.
     private void checkBoth() {
         // Check if we need to correct to the left.

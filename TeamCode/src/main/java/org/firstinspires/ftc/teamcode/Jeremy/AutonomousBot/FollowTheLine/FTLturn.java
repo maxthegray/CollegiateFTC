@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.AutonomousBot.FollowTheLine;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
@@ -17,9 +18,9 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
 
-@Autonomous(name="FTL: encoderdrive colorsensor", group="FTL")
-//@Disabled
-public class FTLmix extends LinearOpMode {
+@Autonomous(name="FTL: without encoder drive manual", group="FTL")
+@Disabled
+public class FTLturn extends LinearOpMode {
 
     /* Declare OpMode members. */
     private double          headingError  = 0;
@@ -54,8 +55,8 @@ public class FTLmix extends LinearOpMode {
     static final double     COUNTS_PER_INCH         = (COUNTS_PER_MOTOR_REV * DRIVE_GEAR_REDUCTION) /
             (WHEEL_DIAMETER_INCHES * 3.1415);
 
-    static final double     DRIVE_SPEED             = 0.3;     // Max driving speed for better distance accuracy.
-    static final double     TURN_SPEED              = 0.1;     // Max Turn speed to limit turn rate
+    static final double     DRIVE_SPEED             = 0.1;     // Max driving speed for better distance accuracy.
+    static final double     TURN_SPEED              = 0.03;     // Max Turn speed to limit turn rate
 
     static final double     HEADING_THRESHOLD       = 1.0 ;    // How close must the heading get to the target before moving to next step.
 
@@ -127,31 +128,33 @@ public class FTLmix extends LinearOpMode {
             imu.resetYaw();
         }
         power = 0.1;
-        tpower = 0.2;
+        tpower = 0.0;
         apower = 0.3;
+        //with gyro motion
         waitForStart();
 
         while (opModeIsActive()) {
             doAllTelemetry();
 
+            telemetry.addData("power", "%4.2f", power);
+            telemetry.addData("turning power", "%4.2f", tpower);
+
             telemetry.update();
 
             imu.resetYaw();
-//            if (distanceSensorLeft.getDistance(DistanceUnit.INCH) < 5) {
-//                encoderDrive(TURN_SPEED,-1,1,0);
-//            }
-//            if (distanceSensorRight.getDistance(DistanceUnit.INCH) < 5) {
-//                encoderDrive(TURN_SPEED,-1,1,0);
-//            }
-            if (getBrightness1() < whiteThreshold && getBrightness2() < whiteThreshold) {
-                encoderDrive(DRIVE_SPEED, 0.5, 0.5, 0.25);
-            }
-            else if (getBrightness1() < whiteThreshold && getBrightness2() > whiteThreshold) {
-                encoderDrive(TURN_SPEED, -1.5, 1, 0.25);
-            } else if (getBrightness2() < whiteThreshold && getBrightness1() > whiteThreshold) {
-                encoderDrive(TURN_SPEED, 1, -1.5, 0.25);
+            if (rightSensorCheck()) {
+
+                leftDrive.setPower(tpower);
+                rightDrive.setPower(power);
+
+            } else if (leftSensorCheck()) {
+
+                leftDrive.setPower(power);
+                rightDrive.setPower(tpower);
+
             } else {
-                encoderDrive(DRIVE_SPEED, 2, 2, 0.25);
+
+                setSpeed(power);
             }
         }
     }
@@ -164,8 +167,12 @@ public class FTLmix extends LinearOpMode {
         telemetry.addData("------------------------", "--------------");
 
         telemetry.addData("Heading- Target : Current", "%5.2f : %5.0f", targetHeading, getHeading());
-        telemetry.addData("Wheel Speeds L : R", "%5.2f : %5.2f", leftSpeed, rightSpeed);
 
+        telemetry.addData("Wheel Speeds L : R", "%5.2f : %5.2f", leftSpeed, rightSpeed);
+        telemetry.addData("Error  : Steer Pwr",  "%5.1f : %5.1f", headingError, turnSpeed);
+        telemetry.addData(">", "Robot Heading = %4.0f", getHeading());
+        telemetry.addData("Heading- Target : Current", "%5.2f : %5.0f", targetHeading, getHeading());
+        telemetry.addData("Error  : Steer Pwr",  "%5.1f : %5.1f", headingError, turnSpeed);
     }
     double getBrightness1() {
         NormalizedRGBA colors = colorSensor1.getNormalizedColors();

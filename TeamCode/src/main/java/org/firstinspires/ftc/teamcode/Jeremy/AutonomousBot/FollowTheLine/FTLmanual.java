@@ -2,12 +2,12 @@ package org.firstinspires.ftc.teamcode.AutonomousBot.FollowTheLine;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
-import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.hardware.SwitchableLight;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
@@ -17,9 +17,9 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
 
-@Autonomous(name="FTL: without encoder drive manual", group="FTL")
-//@Disabled
-public class FTLturn extends LinearOpMode {
+@Autonomous(name="FTL: distance sensor manual", group="FTL")
+@Disabled
+public class FTLmanual extends LinearOpMode {
 
     /* Declare OpMode members. */
     private double          headingError  = 0;
@@ -27,12 +27,10 @@ public class FTLturn extends LinearOpMode {
     private DcMotor         leftDrive   = null;
     private DcMotor         rightDrive  = null;
     private IMU imu         = null;
-    NormalizedColorSensor colorSensor1;
-    NormalizedColorSensor colorSensor2;
     private DistanceSensor distanceSensorLeft;
     private DistanceSensor distanceSensorRight;
-    private ElapsedTime     runtime = new ElapsedTime();
-
+    NormalizedColorSensor colorSensor1;
+    NormalizedColorSensor colorSensor2;
 
     private double  targetHeading = 0;
     private double  driveSpeed    = 0;
@@ -43,7 +41,6 @@ public class FTLturn extends LinearOpMode {
     private int     rightTarget   = 0;
     double power = 0;
     double tpower = 0;
-    double apower = 0;
     boolean movingforward = true;
 
     static final double whiteThreshold = 0.20;  // spans between 0.0 - 1.0 from dark to light
@@ -53,15 +50,13 @@ public class FTLturn extends LinearOpMode {
     static final double     WHEEL_DIAMETER_INCHES   = 4.0 ;     // For figuring circumference
     static final double     COUNTS_PER_INCH         = (COUNTS_PER_MOTOR_REV * DRIVE_GEAR_REDUCTION) /
             (WHEEL_DIAMETER_INCHES * 3.1415);
-
-    static final double     DRIVE_SPEED             = 0.1;     // Max driving speed for better distance accuracy.
+    static final double     DRIVE_SPEED             = 0.5;     // Max driving speed for better distance accuracy.
     static final double     TURN_SPEED              = 0.03;     // Max Turn speed to limit turn rate
 
     static final double     HEADING_THRESHOLD       = 1.0 ;    // How close must the heading get to the target before moving to next step.
 
     static final double     P_TURN_GAIN            = 0.02;     // Larger is more responsive, but also less stable
     static final double     P_DRIVE_GAIN           = 0.03;     // Larger is more responsive, but also less stable
-    ElapsedTime getOut = new ElapsedTime();
 
     @Override
     public void runOpMode() {
@@ -76,6 +71,7 @@ public class FTLturn extends LinearOpMode {
         colorSensor2 = hardwareMap.get(NormalizedColorSensor.class, "sensor_color2");
         distanceSensorLeft = hardwareMap.get(DistanceSensor.class, "sensor_distance");
         distanceSensorRight = hardwareMap.get(DistanceSensor.class, "sensor_distance2");
+
 
 
         RevHubOrientationOnRobot.LogoFacingDirection logoDirection = RevHubOrientationOnRobot.LogoFacingDirection.UP;
@@ -107,102 +103,54 @@ public class FTLturn extends LinearOpMode {
 
 
         while (opModeInInit()) {
-
-            if (getBrightness1() > whiteThreshold && getBrightness2() > whiteThreshold) {
-                telemetry.addData("Status", "In between line, ready to go");
-            } else if (getBrightness1() < whiteThreshold && getBrightness2() < whiteThreshold) {
-                telemetry.addData("Status", "above white threshold on both sensors");
-
-            } else if (getBrightness1() < whiteThreshold && getBrightness2() > whiteThreshold) {
-                telemetry.addData("Status", "above white threshold on color sensor 1");
-            } else if (getBrightness1() > whiteThreshold && getBrightness2() < whiteThreshold) {
-                telemetry.addData("Status", "above white threshold on color sensor 2");
-            } else {
-                telemetry.addData("Status", "error of some sort");
-            }
-
-            doAllTelemetry();
-            telemetry.update();
-
-            imu.resetYaw();
+            telemetry.addData("im so cool", "'heyy maxieee i love you' - said all girls every", power);
         }
-        power = 0.1;
+        if (leftSensorCheck()) {
+            telemetry.addData("LeftSensor", "DETECTED", power);
+        } else {
+            telemetry.addData("LeftSensor", "NOT DETECTED", power);
+        }
+        if (rightSensorCheck()) {
+            telemetry.addData("RightSensor", "DETECTED", power);
+        } else {
+            telemetry.addData("RightSensor", "NOT DETECTED", power);
+        }
+        power = 0.4;
         tpower = 0.0;
-        apower = 0.3;
+        boolean done = false;
         //with gyro motion
         waitForStart();
+        imu.resetYaw();
 
         while (opModeIsActive()) {
-            doAllTelemetry();
-
+            if (leftSensorCheck()) {
+                telemetry.addData("LeftSensor", "DETECTED - TURNING LEFT", power);
+            } else {
+                telemetry.addData("LeftSensor", "NOT DETECTED", power);
+            }
+            if (rightSensorCheck()) {
+                telemetry.addData("RightSensor", "DETECTED - TURNING RIGHT", power);
+            } else {
+                telemetry.addData("RightSensor", "NOT DETECTED", power);
+            }
             telemetry.addData("power", "%4.2f", power);
             telemetry.addData("turning power", "%4.2f", tpower);
 
             telemetry.update();
-
-            imu.resetYaw();
             if (rightSensorCheck()) {
-
-                leftDrive.setPower(tpower);
-                rightDrive.setPower(power);
-
-            } else if (leftSensorCheck()) {
-
                 leftDrive.setPower(power);
                 rightDrive.setPower(tpower);
-
+            }
+            else if (leftSensorCheck()) {
+                leftDrive.setPower(tpower);
+                rightDrive.setPower(power);
             } else {
-
                 setSpeed(power);
             }
         }
-    }
-    private void doAllTelemetry() {
-        NormalizedRGBA colors1 = colorSensor1.getNormalizedColors();
-        telemetry.addData("Light Level (0 to 1)Left Sensor",  "%4.2f", colors1.alpha);
-        NormalizedRGBA colors2 = colorSensor2.getNormalizedColors();
-        telemetry.addData("Light Level (0 to 1) Right Sensor",  "%4.2f", colors2.alpha);
 
-        telemetry.addData("------------------------", "--------------");
-
-        telemetry.addData("Heading- Target : Current", "%5.2f : %5.0f", targetHeading, getHeading());
-
-        telemetry.addData("Wheel Speeds L : R", "%5.2f : %5.2f", leftSpeed, rightSpeed);
-        telemetry.addData("Error  : Steer Pwr",  "%5.1f : %5.1f", headingError, turnSpeed);
-        telemetry.addData(">", "Robot Heading = %4.0f", getHeading());
-        telemetry.addData("Heading- Target : Current", "%5.2f : %5.0f", targetHeading, getHeading());
-        telemetry.addData("Error  : Steer Pwr",  "%5.1f : %5.1f", headingError, turnSpeed);
-    }
-    double getBrightness1() {
-        NormalizedRGBA colors = colorSensor1.getNormalizedColors();
-        return colors.alpha;
-    }
-    double getBrightness2() {
-        NormalizedRGBA colors = colorSensor2.getNormalizedColors();
-        return colors.alpha;
     }
 
-    private boolean rightSensorCheck() {
-        if (distanceSensorRight.getDistance(DistanceUnit.INCH) < 10) {
-            return true;
-        }
-        if (distanceSensorRight.getDistance(DistanceUnit.INCH) > 10) {
-            return false;
-        }
-        return true;
-    }
-    private boolean leftSensorCheck() {
-        if (distanceSensorLeft.getDistance(DistanceUnit.INCH) < 10) {
-            return true;
-        }
-        if (distanceSensorLeft.getDistance(DistanceUnit.INCH) > 10) {
-            return false;
-        }
-        return true;
-    }
-    private void turnTo(double heading) {
-        turnToHeading(P_TURN_GAIN, heading);
-    }
     private void setSpeed(double speed) {
         leftDrive.setPower(speed);
         rightDrive.setPower(speed);
@@ -211,42 +159,7 @@ public class FTLturn extends LinearOpMode {
     private void move(double distance, double turn) {
         moveRobot(distance, turn);
     }
-    private void checkLeft() {
-        if (getBrightness1() < whiteThreshold) {
-            encoderDrive(TURN_SPEED, -1, 1, 0.0);
-        }
-    }
-    private void checkRight() {
-        if (getBrightness2() < whiteThreshold) {
-            encoderDrive(TURN_SPEED, 1, -1, 0.0);
-        }
-    }
 
-    //checkBoth() is basically just checkRight + checkLeft.
-    private void checkBoth() {
-        // Check if we need to correct to the left.
-        boolean hasTurnedLeft = false;
-        if (getBrightness1() < whiteThreshold && getBrightness2() > whiteThreshold) {
-            leftDrive.setPower(0.01);
-            rightDrive.setPower(tpower);
-            hasTurnedLeft = true;
-        }
-        if (hasTurnedLeft) {
-            return;
-        }
-        // Check if we need to correct to the right.
-        if (getBrightness2() < whiteThreshold && getBrightness1() > whiteThreshold) {
-            rightDrive.setPower(0.01);
-            leftDrive.setPower(tpower);
-        }
-    }
-    private void checkLineRight(double turn, double adjustment) {
-        getBrightness2();
-        while (getBrightness2() > whiteThreshold) {
-            move(0, -turn);
-        }
-        move(0, -adjustment);
-    }
     private void rampPower(double increment, double topSpeed) {
         if (true) {
             // Keep stepping up until we hit the max value.
@@ -256,6 +169,24 @@ public class FTLturn extends LinearOpMode {
             }
         }
 
+    }
+    private boolean rightSensorCheck() {
+        if (distanceSensorRight.getDistance(DistanceUnit.INCH) < 15) {
+            return true;
+        }
+        if (distanceSensorRight.getDistance(DistanceUnit.INCH) > 15) {
+            return false;
+        }
+        return true;
+    }
+    private boolean leftSensorCheck() {
+        if (distanceSensorLeft.getDistance(DistanceUnit.INCH) < 15) {
+            return true;
+        }
+        if (distanceSensorLeft.getDistance(DistanceUnit.INCH) > 15) {
+            return false;
+        }
+        return true;
     }
 
 
@@ -474,57 +405,5 @@ public class FTLturn extends LinearOpMode {
         YawPitchRollAngles orientation = imu.getRobotYawPitchRollAngles();
         return orientation.getYaw(AngleUnit.DEGREES);
     }
-    public void encoderDrive(double speed,
-                             double leftInches, double rightInches,
-                             double timeoutS) {
-        int newLeftTarget;
-        int newRightTarget;
-
-        // Ensure that the OpMode is still active
-        if (opModeIsActive()) {
-
-            // Determine new target position, and pass to motor controller
-            newLeftTarget = leftDrive.getCurrentPosition() + (int) (leftInches * COUNTS_PER_INCH);
-            newRightTarget = rightDrive.getCurrentPosition() + (int) (rightInches * COUNTS_PER_INCH);
-            leftDrive.setTargetPosition(newLeftTarget);
-            rightDrive.setTargetPosition(newRightTarget);
-
-            // Turn On RUN_TO_POSITION
-            leftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            rightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-
-            // reset the timeout time and start motion.
-            runtime.reset();
-            leftDrive.setPower(Math.abs(speed));
-            rightDrive.setPower(Math.abs(speed));
-
-            // keep looping while we are still active, and there is time left, and both motors are running.
-            // Note: We use (isBusy() && isBusy()) in the loop test, which means that when EITHER motor hits
-            // its target position, the motion will stop.  This is "safer" in the event that the robot will
-            // always end the motion as soon as possible.
-            // However, if you require that BOTH motors have finished their moves before the robot continues
-            // onto the next step, use (isBusy() || isBusy()) in the loop test.
-            while (opModeIsActive() &&
-                    (runtime.seconds() < timeoutS) &&
-                    (leftDrive.isBusy() && rightDrive.isBusy())) {
-
-                // Display it for the driver.
-                telemetry.addData("Running to", " %7d :%7d", newLeftTarget, newRightTarget);
-                telemetry.addData("Currently at", " at %7d :%7d",
-                        leftDrive.getCurrentPosition(), rightDrive.getCurrentPosition());
-                telemetry.update();
-            }
-
-            // Stop all motion;
-            leftDrive.setPower(0);
-            rightDrive.setPower(0);
-
-            // Turn off RUN_TO_POSITION
-            leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-            rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-
-            sleep(250);   // optional pause after each move.
-        }
-
-    }
 }
+

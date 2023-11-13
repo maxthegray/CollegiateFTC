@@ -1,195 +1,220 @@
+/* Copyright (c) 2017 FIRST. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted (subject to the limitations in the disclaimer below) provided that
+ * the following conditions are met:
+ *
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ *
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or
+ * other materials provided with the distribution.
+ *
+ * Neither the name of FIRST nor the names of its contributors may be used to endorse or
+ * promote products derived from this software without specific prior written permission.
+ *
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS
+ * LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 package org.firstinspires.ftc.teamcode.AutonomousBot.FollowTheLine;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
+import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.hardware.SwitchableLight;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
-import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
+/*
+ * This OpMode illustrates the concept of driving up to a line and then stopping.
+ * The code is structured as a LinearOpMode
+ *
+ * The Sensor used here can be a REV Color Sensor V2 or V3.  Make sure the white LED is turned on.
+ * The sensor can be plugged into any I2C port, and must be named "sensor_color" in the active configuration.
+ *
+ *   Depending on the height of your color sensor, you may want to set the sensor "gain".
+ *   The higher the gain, the greater the reflected light reading will be.
+ *   Use the SensorColor sample in this folder to determine the minimum gain value that provides an
+ *   "Alpha" reading of 1.0 when you are on top of the white line.  In this sample, we use a gain of 15
+ *   which works well with a Rev V2 color sensor
+ *
+ *   Setting the correct WHITE_THRESHOLD value is key to stopping correctly.
+ *   This should be set halfway between the bare-tile, and white-line "Alpha" values.
+ *   The reflected light value can be read on the screen once the OpMode has been INIT, but before it is STARTED.
+ *   Move the sensor on and off the white line and note the min and max readings.
+ *   Edit this code to make WHITE_THRESHOLD halfway between the min and max.
+ *
+ *   Use Android Studio to Copy this Class, and Paste it into your team's code folder with a new name.
+ *   Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
+ */
 
-@Autonomous(name="FTL: distance sensor manual", group="FTL")
-//@Disabled
-public class FTLmanual extends LinearOpMode {
+@Autonomous(name="FTL: Follow The Split (bleh dont use its bad im superior to whoever made this (me last week i just found another sensor))", group="FTL")
+@Disabled
+public class FollowTheSplit extends LinearOpMode {
 
     /* Declare OpMode members. */
-    private double          headingError  = 0;
-
     private DcMotor         leftDrive   = null;
     private DcMotor         rightDrive  = null;
     private IMU imu         = null;
-    private DistanceSensor distanceSensorLeft;
-    private DistanceSensor distanceSensorRight;
-    NormalizedColorSensor colorSensor1;
-    NormalizedColorSensor colorSensor2;
+    NormalizedColorSensor colorSensor;
+    private double          headingError  = 0;
 
     private double  targetHeading = 0;
-    private double  driveSpeed    = 0;
+    private double driveSpeed = 0;
     private double turnSpeed = 0;
     private double  leftSpeed     = 0;
     private double  rightSpeed    = 0;
     private int     leftTarget    = 0;
     private int     rightTarget   = 0;
-    double power = 0;
-    double tpower = 0;
-    boolean movingforward = true;
 
-    static final double whiteThreshold = 0.20;  // spans between 0.0 - 1.0 from dark to light
-
+    static final double whiteThreshold = 0.5;  // spans between 0.0 - 1.0 from dark to light
+    static final double splitThresholdLow = 0.70;
+    static final double splitThresholdHigh = 0.80;
     static final double     COUNTS_PER_MOTOR_REV    = 1440 ;
     static final double     DRIVE_GEAR_REDUCTION    = 1.0 ; //no external gearing
     static final double     WHEEL_DIAMETER_INCHES   = 4.0 ;     // For figuring circumference
     static final double     COUNTS_PER_INCH         = (COUNTS_PER_MOTOR_REV * DRIVE_GEAR_REDUCTION) /
             (WHEEL_DIAMETER_INCHES * 3.1415);
-    static final double     DRIVE_SPEED             = 0.5;     // Max driving speed for better distance accuracy.
-    static final double     TURN_SPEED              = 0.03;     // Max Turn speed to limit turn rate
 
-    static final double     HEADING_THRESHOLD       = 1.0 ;    // How close must the heading get to the target before moving to next step.
+    static final double     DRIVE_SPEED             = .3;     // Max driving speed for better distance accuracy.
+    static final double     TURN_SPEED              = 0.3;     // Max Turn speed to limit turn rate
+
+    static final double     HEADING_THRESHOLD       = 0.1 ;    // How close must the heading get to the target before moving to next step.
 
     static final double     P_TURN_GAIN            = 0.02;     // Larger is more responsive, but also less stable
-    static final double     P_DRIVE_GAIN           = 0.03;     // Larger is more responsive, but also less stable
+    static final double     P_DRIVE_GAIN           = 0.3;     // Larger is more responsive, but also less stable
 
     @Override
     public void runOpMode() {
 
-        // initialize the drive variables.
-//            Robot robot = new Robot(hardwareMap, new Movement()); stoopid i hate java
-        // TO MAX: once you've moved all the code:
-        leftDrive = hardwareMap.get(DcMotor.class, "left_drive");
+        // Initialize the drive system variables.
+        leftDrive  = hardwareMap.get(DcMotor.class, "left_drive");
         rightDrive = hardwareMap.get(DcMotor.class, "right_drive");
         imu = hardwareMap.get(IMU.class, "imu");
-        colorSensor1 = hardwareMap.get(NormalizedColorSensor.class, "sensor_color1");
-        colorSensor2 = hardwareMap.get(NormalizedColorSensor.class, "sensor_color2");
-        distanceSensorLeft = hardwareMap.get(DistanceSensor.class, "sensor_distance");
-        distanceSensorRight = hardwareMap.get(DistanceSensor.class, "sensor_distance2");
-
-
+        colorSensor = hardwareMap.get(NormalizedColorSensor.class, "sensor_color");
+        // Get a reference to our sensor object. It's recommended to use NormalizedColorSensor over
+        // ColorSensor, because NormalizedColorSensor consistently gives values between 0 and 1, while
+        // the values you get from ColorSensor are dependent on the specific sensor you're using.
 
         RevHubOrientationOnRobot.LogoFacingDirection logoDirection = RevHubOrientationOnRobot.LogoFacingDirection.UP;
         RevHubOrientationOnRobot.UsbFacingDirection usbDirection = RevHubOrientationOnRobot.UsbFacingDirection.FORWARD;
         RevHubOrientationOnRobot orientationOnRobot = new RevHubOrientationOnRobot(logoDirection, usbDirection);
         imu.initialize(new IMU.Parameters(orientationOnRobot));
 
-        leftDrive.setDirection(DcMotor.Direction.REVERSE);
-        rightDrive.setDirection(DcMotor.Direction.FORWARD);
+
         leftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         rightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         leftDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
+        // Set the encoders for closed loop speed control, and reset the heading.
         leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         imu.resetYaw();
 
-        if (colorSensor1 instanceof SwitchableLight) {
-            ((SwitchableLight) colorSensor1).enableLight(true);
-        }
-        if (colorSensor2 instanceof SwitchableLight) {
-            ((SwitchableLight) colorSensor1).enableLight(true);
-        }
 
-
-        colorSensor1.setGain(15);
-        colorSensor2.setGain(15);
+        if (colorSensor instanceof SwitchableLight) {
+            ((SwitchableLight)colorSensor).enableLight(true);
+        }
 
 
         while (opModeInInit()) {
-            telemetry.addData("im so cool", "'heyy maxieee i love you' - said all girls every", power);
-        }
-        if (leftSensorCheck()) {
-            telemetry.addData("LeftSensor", "DETECTED", power);
-        } else {
-            telemetry.addData("LeftSensor", "NOT DETECTED", power);
-        }
-        if (rightSensorCheck()) {
-            telemetry.addData("RightSensor", "DETECTED", power);
-        } else {
-            telemetry.addData("RightSensor", "NOT DETECTED", power);
-        }
-        power = 0.4;
-        tpower = 0.0;
-        boolean done = false;
-        //with gyro motion
-        waitForStart();
-        imu.resetYaw();
 
-        while (opModeIsActive()) {
-            if (leftSensorCheck()) {
-                telemetry.addData("LeftSensor", "DETECTED - TURNING LEFT", power);
-            } else {
-                telemetry.addData("LeftSensor", "NOT DETECTED", power);
-            }
-            if (rightSensorCheck()) {
-                telemetry.addData("RightSensor", "DETECTED - TURNING RIGHT", power);
-            } else {
-                telemetry.addData("RightSensor", "NOT DETECTED", power);
-            }
-            telemetry.addData("power", "%4.2f", power);
-            telemetry.addData("turning power", "%4.2f", tpower);
+        }
 
+        // If necessary, turn ON the white LED (if there is no LED switch on the sensor)
+        // Some sensors allow you to set your light sensor gain for optimal sensitivity...
+        // See the SensorColor sample in this folder for how to determine the optimal gain.
+        // A gain of 15 causes a Rev Color Sensor V2 to produce an Alpha value of 1.0 at about 1.5" above the floor.
+        colorSensor.setGain(15);
+
+        // Wait for driver to press PLAY)
+        // Abort this loop is started or stopped.hy
+        while (opModeInInit()) {
+            if (splitThresholdHigh > getBrightness() && getBrightness() < splitThresholdLow) {
+                telemetry.addData("Status", "on the split");
+            } else {
+                telemetry.addData("Status","not on the split");
+            }
+            telemetry.addData(">", "Robot Heading = %4.0f", getHeading());
             telemetry.update();
-            if (rightSensorCheck()) {
-                leftDrive.setPower(power);
-                rightDrive.setPower(tpower);
-            }
-            else if (leftSensorCheck()) {
-                leftDrive.setPower(tpower);
-                rightDrive.setPower(power);
-            } else {
-                setSpeed(power);
-            }
+            imu.resetYaw();
+
+            // Display the light level while we are waiting to start
+            getBrightness();
         }
-
-    }
-
-    private void setSpeed(double speed) {
-        leftDrive.setPower(speed);
-        rightDrive.setPower(speed);
-    }
-
-    private void move(double distance, double turn) {
-        moveRobot(distance, turn);
-    }
-
-    private void rampPower(double increment, double topSpeed) {
-        if (true) {
-            // Keep stepping up until we hit the max value.
-            power += increment ;
-            if (power >= topSpeed ) {
-                power = topSpeed;
+        while (opModeIsActive()) {
+            if (splitThresholdHigh > getBrightness() && getBrightness() > splitThresholdLow) {
+                leftDrive.setPower(driveSpeed);
+                rightDrive.setPower(driveSpeed);
+            } else if(getBrightness() < splitThresholdLow) {
+                checkLeft();
+                imu.resetYaw();
+            } else if(getBrightness() > splitThresholdHigh){
+                checkRight();
+                imu.resetYaw();
+            }
+            else {
+                telemetry.addData("Somethings", "Wrong");
             }
         }
 
-    }
-    private boolean rightSensorCheck() {
-        if (distanceSensorRight.getDistance(DistanceUnit.INCH) < 15) {
-            return true;
-        }
-        if (distanceSensorRight.getDistance(DistanceUnit.INCH) > 15) {
-            return false;
-        }
-        return true;
-    }
-    private boolean leftSensorCheck() {
-        if (distanceSensorLeft.getDistance(DistanceUnit.INCH) < 15) {
-            return true;
-        }
-        if (distanceSensorLeft.getDistance(DistanceUnit.INCH) > 15) {
-            return false;
-        }
-        return true;
+        // Stop all motors
+        leftDrive.setPower(0);
+        rightDrive.setPower(0);
     }
 
+    // to obtain reflected light, read the normalized values from the color sensor.  Return the Alpha channel.
+    double getBrightness() {
+        NormalizedRGBA colors = colorSensor.getNormalizedColors();
+        telemetry.addData("Light Level (0 to 1)",  "%4.2f", colors.alpha);
+        telemetry.update();
 
+        return colors.alpha;
+    }
+    private void checkLeft() {
+        while (splitThresholdLow > getBrightness()) {
+            imu.resetYaw();
+            driveStraight(DRIVE_SPEED, 1, 0);
+            turnToHeading(TURN_SPEED, 5);
+        }
+    }
+    private void checkRight() {
+        while(getBrightness() > splitThresholdHigh) {
+            imu.resetYaw();
+            driveStraight(DRIVE_SPEED, 1, 0);
+            turnToHeading(TURN_SPEED, -5);
+        }
+    }
+    private void turnTo(int heading) {
+        turnToHeading(TURN_SPEED, heading);
+    }
+    private void checkforline(int degreesOfCheck) {
+        turnTo(-degreesOfCheck);
+        if (getBrightness() > whiteThreshold) {
+            turnTo(degreesOfCheck);
+        }
 
+    }
     /**
      *  Drive in a straight line, on a fixed compass heading (angle), based on encoder counts.
      *  Move will stop if either of these conditions occur:

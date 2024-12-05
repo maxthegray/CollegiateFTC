@@ -17,7 +17,7 @@ public class BasicDrive extends LinearOpMode {
 
 
         if (isStopRequested()) return;
-            core.init();
+        core.init();
 
         while (opModeIsActive()) {
 

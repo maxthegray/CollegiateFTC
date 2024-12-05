@@ -25,10 +25,6 @@ public class BasicDrive1 extends LinearOpMode {
         IMU imu = hardwareMap.get(IMU.class, "imu");
 
 
-        boolean sampleHeld = false;
-        boolean toggleHold = false;
-
-
         // Reverse the right side motors. This may be wrong for your setup.
         // If your robot moves backwards when commanded to go forwards,
         // reverse the left side instead.
